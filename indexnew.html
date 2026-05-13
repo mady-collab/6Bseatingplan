@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5B 互動式教室座位表</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .classroom-grid {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 40px 40px;
+            height: 850px; /* 固定高度以利於視角翻轉計算 */
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #cbd5e1;
+            border-radius: 0 0 12px 12px;
+        }
+        .student-card {
+            width: 110px;
+            cursor: move;
+            position: absolute;
+            transition: box-shadow 0.2s ease; /* 移除 transform transition 以免拖曳延遲 */
+            user-select: none;
+            touch-action: none;
+            z-index: 10;
+        }
+        .student-card:active {
+            z-index: 100;
+        }
+        .avatar-box {
+            width: 85px;
+            height: 85px;
+            background-color: #ffffff;
+            border: 3px solid #3b82f6;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            margin: 0 auto;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            transition: border-color 0.3s;
+        }
+        .teacher-mode .avatar-box {
+            border-color: #ef4444; /* 老師視角變紅色邊框 */
+        }
+        .avatar-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+        .podium {
+            width: 300px;
+            height: 50px;
+            background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            letter-spacing: 0.1em;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+        #podium-top { top: 0; border-radius: 0 0 20px 20px; }
+        #podium-bottom { bottom: 0; border-radius: 20px 20px 0 0; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); box-shadow: 0 -4px 6px rgba(0,0,0,0.1); }
+        .score-btn { cursor: pointer; transition: background-color 0.2s; }
+        
+        /* 分頁標籤樣式 */
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            font-weight: bold;
+            border-radius: 12px 12px 0 0;
+            transition: all 0.2s;
+        }
+        .tab-active-student { background-color: #3b82f6; color: white; border: 2px solid #3b82f6; border-bottom: none; }
+        .tab-active-teacher { background-color: #ef4444; color: white; border: 2px solid #ef4444; border-bottom: none; }
+        .tab-inactive { background-color: #e2e8f0; color: #64748b; border: 2px solid transparent; border-bottom: none; }
+        .tab-inactive:hover { background-color: #cbd5e1; color: #334155; }
+    </style>
+</head>
+<body class="bg-slate-50 p-6 min-h-screen">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">5B 座位與計分管理</h1>
+                <p class="text-slate-500 mt-1">使用分頁切換視角 / 拖動排座位 / 點擊 + - 調整分數</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="saveLayout()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-all flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    儲存佈局
+                </button>
+                <button onclick="resetScores()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-all">
+                    分數歸零
+                </button>
+                <button onclick="resetLayout()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-4 py-2 rounded-lg font-medium shadow-sm transition-all">
+                    重置座位
+                </button>
+            </div>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-lg border border-slate-200">
+            <!-- 視角切換分頁 -->
+            <div class="flex px-4 pt-4 border-b-2 border-slate-200 gap-2">
+                <button id="btn-student" onclick="switchView('student')" class="tab-btn tab-active-student">
+                    👨‍🎓 學生視角 (講台在前)
+                </button>
+                <button id="btn-teacher" onclick="switchView('teacher')" class="tab-btn tab-inactive">
+                    👩‍🏫 老師視角 (講台在您這)
+                </button>
+            </div>
+
+            <!-- 教室主體 -->
+            <div id="classroom" class="classroom-grid">
+                <div id="podium-top" class="podium">講台 / 黑板方向</div>
+                <div id="podium-bottom" class="podium" style="display: none;">您在此處 (講台 / 黑板)</div>
+                <!-- 學生卡片將由 JavaScript 生成 -->
+            </div>
+        </div>
+
+        <footer class="mt-6 text-center text-slate-400 text-sm pb-8">
+            提示：照片讀取格式為 5b01.jpg | 所有修改都會自動對應到兩個視角
+        </footer>
+    </div>
+
+    <script>
+        const students = [
+            { id: "01", name: "Gordon C" }, { id: "02", name: "Clarus" }, { id: "03", name: "Noleen" },
+            { id: "04", name: "Jamie" }, { id: "05", name: "Vivian" }, { id: "06", name: "Torrise" },
+            { id: "07", name: "Yanice" }, { id: "08", name: "Charlie" }, { id: "09", name: "Joel" },
+            { id: "10", name: "Giuseppe" }, { id: "11", name: "Alpha" }, { id: "12", name: "Aayan" },
+            { id: "13", name: "Alson" }, { id: "14", name: "Anisha" }, { id: "16", name: "Farida" },
+            { id: "18", name: "Arianne" }, { id: "19", name: "Kate" }, { id: "20", name: "Nihnam" },
+            { id: "21", name: "Wahenoor" }, { id: "22", name: "Viraj" }, { id: "23", name: "Gordon T" },
+            { id: "24", name: "Jasnoor" }
+        ];
+
+        const classroom = document.getElementById('classroom');
+        let studentScores = JSON.parse(localStorage.getItem('studentScores_5B_V2')) || {};
+        // 永遠以「學生視角」為基準儲存座標
+        let savedPositions = JSON.parse(localStorage.getItem('seatingPositions_5B_V2')) || {};
+        
+        let currentView = 'student'; // 'student' 或是 'teacher'
+        let activeCard = null;
+        let offset = { x: 0, y: 0 };
+
+        function initStudents() {
+            // 清除現有卡片 (保留講台)
+            const cards = classroom.querySelectorAll('.student-card');
+            cards.forEach(card => card.remove());
+            
+            const containerWidth = classroom.clientWidth;
+            const containerHeight = classroom.clientHeight;
+
+            students.forEach((student, index) => {
+                const card = document.createElement('div');
+                card.className = `student-card text-center ${currentView === 'teacher' ? 'teacher-mode' : ''}`;
+                card.id = `student-${student.id}`;
+                
+                // 預設位置 (以學生視角為準)
+                const colCount = 6;
+                const defaultX = (index % colCount) * 140 + 60;
+                const defaultY = Math.floor(index / colCount) * 160 + 70; // +70 避開頂部講台
+                
+                const pos = savedPositions[student.id] || { x: defaultX, y: defaultY };
+                
+                // 根據當前視角計算實際顯示的 X, Y
+                let displayX, displayY;
+                const cardWidth = 110;
+                const cardHeight = 145; // 卡片大致高度(含計分)
+
+                if (currentView === 'teacher') {
+                    // 老師視角：將座標翻轉 180 度
+                    displayX = containerWidth - cardWidth - pos.x;
+                    displayY = containerHeight - cardHeight - pos.y;
+                } else {
+                    displayX = pos.x;
+                    displayY = pos.y;
+                }
+
+                card.style.left = displayX + 'px';
+                card.style.top = displayY + 'px';
+
+                const fileName = `5b${student.id}.jpg`;
+                const currentScore = studentScores[student.id] || 0;
+
+                card.innerHTML = `
+                    <div class="avatar-box">
+                        <img src="${fileName}" alt="${student.name}" onerror="this.src='https://ui-avatars.com/api/?name=${student.name}&background=eff6ff&color=1d4ed8&size=128&bold=true'">
+                    </div>
+                    <div class="mt-2 inline-block bg-white/95 backdrop-blur rounded-lg border border-slate-200 shadow-sm p-1.5 min-w-[90px]">
+                        <div class="text-[10px] uppercase ${currentView === 'teacher' ? 'text-red-400' : 'text-slate-400'} font-bold tracking-wider leading-none mb-0.5">NO.${student.id}</div>
+                        <div class="text-xs font-bold text-slate-800 whitespace-nowrap mb-1">${student.name}</div>
+                        <div class="flex items-center justify-between border-t border-slate-100 pt-1 mt-1">
+                            <button class="score-btn text-red-500 hover:bg-red-50 rounded px-2 py-0.5 text-sm font-bold" onclick="updateScore('${student.id}', -1, event)">-</button>
+                            <span class="text-sm font-extrabold text-indigo-600 w-6 text-center" id="score-${student.id}">${currentScore}</span>
+                            <button class="score-btn text-green-500 hover:bg-green-50 rounded px-2 py-0.5 text-sm font-bold" onclick="updateScore('${student.id}', 1, event)">+</button>
+                        </div>
+                    </div>
+                `;
+
+                // 綁定事件
+                card.addEventListener('mousedown', startDragging);
+                card.addEventListener('touchstart', (e) => {
+                    if(e.target.closest('.score-btn')) return;
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent("mousedown", { clientX: touch.clientX, clientY: touch.clientY });
+                    card.dispatchEvent(mouseEvent);
+                }, { passive: false });
+                
+                classroom.appendChild(card);
+            });
+        }
+
+        // 視角切換邏輯
+        window.switchView = function(view) {
+            currentView = view;
+            
+            // 更新按鈕樣式
+            const btnStudent = document.getElementById('btn-student');
+            const btnTeacher = document.getElementById('btn-teacher');
+            
+            if (view === 'student') {
+                btnStudent.className = 'tab-btn tab-active-student';
+                btnTeacher.className = 'tab-btn tab-inactive';
+                document.getElementById('podium-top').style.display = 'flex';
+                document.getElementById('podium-bottom').style.display = 'none';
+            } else {
+                btnStudent.className = 'tab-btn tab-inactive';
+                btnTeacher.className = 'tab-btn tab-active-teacher';
+                document.getElementById('podium-top').style.display = 'none';
+                document.getElementById('podium-bottom').style.display = 'flex';
+            }
+            
+            // 重新渲染卡片位置
+            initStudents();
+        }
+
+        // 分數更新
+        window.updateScore = function(id, delta, event) {
+            event.stopPropagation();
+            studentScores[id] = (studentScores[id] || 0) + delta;
+            document.getElementById(`score-${id}`).innerText = studentScores[id];
+            localStorage.setItem('studentScores_5B_V2', JSON.stringify(studentScores));
+        };
+
+        // 拖曳相關邏輯
+        function startDragging(e) {
+            if(e.target.closest('.score-btn')) return;
+            activeCard = e.currentTarget;
+            activeCard.style.transform = "scale(1.05)";
+            activeCard.style.zIndex = "1000";
+            const rect = activeCard.getBoundingClientRect();
+            
+            offset.x = e.clientX - rect.left;
+            offset.y = e.clientY - rect.top;
+            
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDragging);
+            document.addEventListener('touchmove', handleTouchMove, { passive: false });
+            document.addEventListener('touchend', stopDragging);
+        }
+
+        function handleTouchMove(e) {
+            if (!activeCard) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent("mousemove", { clientX: touch.clientX, clientY: touch.clientY });
+            document.dispatchEvent(mouseEvent);
+        }
+
+        function drag(e) {
+            if (!activeCard) return;
+            const parentRect = classroom.getBoundingClientRect();
+            let x = e.clientX - parentRect.left - offset.x;
+            let y = e.clientY - parentRect.top - offset.y;
+            
+            // 邊界限制
+            x = Math.max(5, Math.min(x, parentRect.width - activeCard.offsetWidth - 5));
+            y = Math.max(5, Math.min(y, parentRect.height - activeCard.offsetHeight - 5));
+            
+            activeCard.style.left = x + 'px';
+            activeCard.style.top = y + 'px';
+        }
+
+        function stopDragging() {
+            if (!activeCard) return;
+            activeCard.style.transform = "none";
+            activeCard.style.zIndex = "10";
+            
+            // 每次放開拖曳後，立刻計算並更新 savedPositions (以確保視角切換時資料正確)
+            let displayX = parseInt(activeCard.style.left);
+            let displayY = parseInt(activeCard.style.top);
+            let studentId = activeCard.id.split('-')[1];
+            
+            const cardWidth = 110;
+            const cardHeight = 145;
+
+            // 如果是在老師視角拖曳，需要反向轉換回學生視角的座標儲存
+            if (currentView === 'teacher') {
+                savedPositions[studentId] = {
+                    x: classroom.clientWidth - cardWidth - displayX,
+                    y: classroom.clientHeight - cardHeight - displayY
+                };
+            } else {
+                savedPositions[studentId] = { x: displayX, y: displayY };
+            }
+
+            activeCard = null;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('mouseup', stopDragging);
+            document.removeEventListener('touchmove', handleTouchMove);
+            document.removeEventListener('touchend', stopDragging);
+        }
+
+        window.saveLayout = function() {
+            localStorage.setItem('seatingPositions_5B_V2', JSON.stringify(savedPositions));
+            showToast("佈局已成功儲存！");
+        };
+
+        window.resetScores = function() {
+            if(confirm("確定要將全班的分數歸零嗎？（座位不會改變）")) {
+                studentScores = {};
+                localStorage.removeItem('studentScores_5B_V2');
+                initStudents();
+                showToast("全班分數已歸零");
+            }
+        };
+        
+        window.resetLayout = function() {
+            if(confirm("確定要重置座位嗎？（分數不會被清空）")) {
+                savedPositions = {};
+                localStorage.removeItem('seatingPositions_5B_V2');
+                initStudents();
+                showToast("座位已重置");
+            }
+        }
+
+        function showToast(text) {
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-[1000] flex items-center gap-2 transform transition-all duration-300 translate-y-20 opacity-0";
+            toast.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> ${text}`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-20', 'opacity-0'), 50);
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // 監聽視窗縮放以重新計算老師視角的位置
+        window.addEventListener('resize', () => {
+            if(currentView === 'teacher') initStudents();
+        });
+
+        window.onload = initStudents;
+    </script>
+</body>
+</html>
