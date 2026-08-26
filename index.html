@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>互動式教室座位表 - 整合版</title>
+    <title>互動式教室座位表 - 6B 整合版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -135,7 +135,7 @@
                         🔒 座位已鎖定
                     </span>
                 </div>
-                <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">5B 座位與計分管理</h1>
+                <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">6B 座位與計分管理</h1>
                 <p class="text-slate-500 mt-1 text-sm">拖動卡片排座位 / 點擊 + - 調整學生分數</p>
             </div>
             
@@ -184,7 +184,7 @@
         </div>
 
         <footer class="mt-8 text-center text-slate-400 text-sm">
-            提示：照片檔案名稱請設定為如 `5b01.jpg`、`5b02.jpg`，並與網頁檔案放在同一資料夾內。
+            提示：照片檔案名稱請設定為如 `6b01.jpg`、`6b02.jpg`，並與網頁檔案放在同一資料夾內。
         </footer>
     </div>
 
@@ -211,20 +211,34 @@
     <script>
         // 學生資料設定
         const students = [
-            { id: "01", name: "Gordon C" }, { id: "02", name: "Clarus" }, { id: "03", name: "Noleen" },
-            { id: "04", name: "Jamie" }, { id: "05", name: "Vivian" }, { id: "06", name: "Torrise" },
-            { id: "07", name: "Yanice" }, { id: "08", name: "Charlie" }, { id: "09", name: "Joel" },
-            { id: "10", name: "Giuseppe" }, { id: "11", name: "Alpha" }, { id: "12", name: "Aayan" },
-            { id: "13", name: "Alson" }, { id: "14", name: "Anisha" }, { id: "16", name: "Farida" },
-            { id: "18", name: "Arianne" }, { id: "19", name: "Kate" }, { id: "20", name: "Nihnam" },
-            { id: "21", name: "Wahenoor" }, { id: "22", name: "Viraj" }, { id: "23", name: "Gordon T" },
-            { id: "24", name: "Jasnoor" }
+            { id: "01", name: "Gordon" },
+            { id: "02", name: "Clarus" },
+            { id: "03", name: "Noleen" },
+            { id: "04", name: "Jamie" },
+            { id: "05", name: "Vivian" },
+            { id: "06", name: "Torrise" },
+            { id: "07", name: "Yanice" },
+            { id: "08", name: "Charlie" },
+            { id: "09", name: "Joel" },
+            { id: "10", name: "Giuseppe" },
+            { id: "11", name: "Alpha" },
+            { id: "12", name: "Aayan" },
+            { id: "13", name: "Alson" },
+            { id: "14", name: "Anisha" },
+            { id: "15", name: "Farida" },
+            { id: "16", name: "Arianne" },
+            { id: "17", name: "Kate" },
+            { id: "18", name: "Nihnam" },
+            { id: "19", name: "Wahenoor" },
+            { id: "20", name: "Viraj" },
+            { id: "21", name: "Gordon" },
+            { id: "22", name: "Jasnoor" }
         ];
 
         // 狀態管理
         const classroom = document.getElementById('classroom');
-        let studentScores = JSON.parse(localStorage.getItem('studentScores_5B_V2')) || {};
-        let savedPositions = JSON.parse(localStorage.getItem('seatingPositions_5B_V2')) || {};
+        let studentScores = JSON.parse(localStorage.getItem('studentScores_6B')) || {};
+        let savedPositions = JSON.parse(localStorage.getItem('seatingPositions_6B')) || {};
         let isTeacherView = false;
         let isLocked = false;
 
@@ -251,8 +265,8 @@
                     card.style.top = pos.y + 'px';
                 }
 
-                // 照片路徑設定 (根據需求設定為 5b01.jpg)
-                const fileName = `5b${student.id}.jpg`;
+                // 照片路徑設定 (根據需求設定為 6b01.jpg)
+                const fileName = `6b${student.id}.jpg`;
                 const currentScore = studentScores[student.id] || 0;
 
                 // 卡片 HTML 結構
@@ -299,7 +313,7 @@
             event.stopPropagation(); // 阻止事件冒泡觸發拖曳
             studentScores[id] = (studentScores[id] || 0) + delta;
             document.getElementById(`score-${id}`).innerText = studentScores[id];
-            localStorage.setItem('studentScores_5B_V2', JSON.stringify(studentScores));
+            localStorage.setItem('studentScores_6B', JSON.stringify(studentScores));
         };
 
         function startDragging(e) {
@@ -440,7 +454,7 @@
         }
 
         window.saveLayout = function() {
-            localStorage.setItem('seatingPositions_5B_V2', JSON.stringify(savedPositions));
+            localStorage.setItem('seatingPositions_6B', JSON.stringify(savedPositions));
             showToast("佈局已成功儲存！");
         };
 
@@ -487,7 +501,7 @@
                 if (input === null) return; // 取消
                 if (input === '666') {
                     studentScores = {};
-                    localStorage.removeItem('studentScores_5B_V2');
+                    localStorage.removeItem('studentScores_6B');
                     initStudents(); // 重新渲染畫面更新分數
                     showToast("✅ 全班分數已歸零！");
                 } else {
@@ -506,7 +520,7 @@
                 if (input === null) return; // 取消
                 if (input === '666') {
                     savedPositions = {};
-                    localStorage.removeItem('seatingPositions_5B_V2');
+                    localStorage.removeItem('seatingPositions_6B');
                     setupDefaultPositions();
                     initStudents(); // 重新渲染
                     showToast("🧹 座位已重置為預設排列。");
@@ -593,7 +607,7 @@
             const downloadAnchorNode = document.createElement('a');
             downloadAnchorNode.setAttribute("href", dataStr);
             const dateStr = new Date().toISOString().split('T')[0];
-            downloadAnchorNode.setAttribute("download", `5B_座位與分數備份_${dateStr}.json`);
+            downloadAnchorNode.setAttribute("download", `6B_座位與分數備份_${dateStr}.json`);
             document.body.appendChild(downloadAnchorNode); // Firefox requires this
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
@@ -623,8 +637,8 @@
                                 studentScores = importedData.scores;
                                 
                                 // 存入本地儲存
-                                localStorage.setItem('seatingPositions_5B_V2', JSON.stringify(savedPositions));
-                                localStorage.setItem('studentScores_5B_V2', JSON.stringify(studentScores));
+                                localStorage.setItem('seatingPositions_6B', JSON.stringify(savedPositions));
+                                localStorage.setItem('studentScores_6B', JSON.stringify(studentScores));
                                 
                                 initStudents();
                                 showToast("✅ 資料匯入成功！");
